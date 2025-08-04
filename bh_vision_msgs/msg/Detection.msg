@@ -1,0 +1,4 @@
+std_msgs/Header header
+vision_msgs/ObjectHypothesisWithPose[] results
+vision_msgs/BoundingBox2D bbox
+bh_vision_msgs/Bearing bearing
