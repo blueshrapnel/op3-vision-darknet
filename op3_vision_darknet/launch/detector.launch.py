@@ -16,6 +16,7 @@ def generate_launch_description():
 
     default_detector_parameter_file = os.path.join(
         get_package_share_directory('op3_vision_darknet'),
+        'config',
         'yolo-v7-tiny',
         'params.yaml'
     )
