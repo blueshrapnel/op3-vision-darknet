@@ -137,11 +137,11 @@ You should see logs indicating the network loaded successfully and that detectio
 
 
 
-## Visualising Detections with RQT
+### Visualising Detections with RQT
 
 To see both the input image and the published detections:
 
-![rqt demo image and detections](assets/rqt_demo_image.png)
+![rqt demo image and detections](../assets/rqt_demo_image.png)
 
 
 1. Select `/demo/image` to see the published input image.
@@ -151,9 +151,9 @@ To see both the input image and the published detections:
 
 ---
 
-## Using the Detection Visualizer
+## Detection Visualizer
 
-The [detection\_visualizer](assets/rqt_demo_image.png) package provides a visualization node that overlays bounding boxes and labels directly on the image stream.
+The [detection\_visualizer](https://github.com/ros2/detection_visualizer) package provides a visualization node that overlays bounding boxes and labels directly on the image stream.
 
 ### 1. (Already included) detection\_visualizer
 
@@ -171,6 +171,10 @@ Open `rqt_image_view` and select:
 
 * `/demo/image` for the raw input
 * `/dbg_image` for the image with bounding boxes drawn
+
+
+![rqt detection bounding boxes](../assets/rqt_detections.png)
+
 
 ---
 
