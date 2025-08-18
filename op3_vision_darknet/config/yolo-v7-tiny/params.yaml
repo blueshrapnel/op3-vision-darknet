@@ -1,0 +1,9 @@
+/**:
+  ros__parameters:
+    network:
+      config: "$(find-pkg-share op3_vision_darknet)/config/yolo-v7-tiny/yolov7-tiny.cfg"
+      weights: "$(find-pkg-share op3_vision_darknet)/config/yolo-v7-tiny/yolov7-tiny.weights"
+      class_names: "$(find-pkg-share op3_vision_darknet)/config/yolo-v7-tiny/coco.names"
+    detection:
+      threshold: 0.25
+      nms_threshold: 0.45
