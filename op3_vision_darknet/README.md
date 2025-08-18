@@ -173,7 +173,7 @@ Open `rqt_image_view` and select:
 * `/dbg_image` for the image with bounding boxes drawn
 
 
-![rqt detection bounding boxes](../assets/rqt_detections.png)
+![rqt detection bounding boxes](../assets/rqt-detections.png)
 
 
 ---
