@@ -27,7 +27,7 @@ set(msg_files
   "msg/Detection.msg"
   "msg/Vision.msg")
 
-rosidl_generate_interfaces(op3_vision.msgs
+rosidl_generate_interfaces(op3_vision_msgs
   ${msg_files}
   DEPENDENCIES builtin_interfaces std_msgs vision_msgs
 )
