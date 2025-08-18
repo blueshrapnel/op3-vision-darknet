@@ -1,13 +1,11 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>bh_vision_msgs</name>
-  <description>Vision messages for the boldhearts team</description>
+  <name>op3_vision_msgs</name>
+  <description>Vision messages for Robot Football</description>
   <version>0.1.0</version>
-  <maintainer email="lewis.riches99@gmail.com">Lewis Riches</maintainer>
+  <maintainer email="karen.archer@gmail.com">Karen Archer</maintainer>
   <license>Apache License 2.0</license>
-
-  <author>Lewis Riches</author>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 

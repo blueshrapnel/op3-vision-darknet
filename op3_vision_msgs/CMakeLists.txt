@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(bh_vision_msgs)
+project(op3_vision_msgs)
 
 # Default to C99
 if(NOT CMAKE_C_STANDARD)
@@ -27,7 +27,7 @@ set(msg_files
   "msg/Detection.msg"
   "msg/Vision.msg")
 
-rosidl_generate_interfaces(bh_vision_msgs
+rosidl_generate_interfaces(op3_vision.msgs
   ${msg_files}
   DEPENDENCIES builtin_interfaces std_msgs vision_msgs
 )
