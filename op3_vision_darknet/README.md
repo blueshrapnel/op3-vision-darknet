@@ -57,7 +57,7 @@ colcon build --cmake-args -DENABLE_CUDA=OFF -DCMAKE_DISABLE_FIND_PACKAGE_OpenMP=
 
 ### Darknet configuration files:
 
-Currently YOLO-V7 and YOLO-V7-tiny are configured but this configuration can be added to by following the stes below:
+Currently YOLO-V7 and YOLO-V7-tiny are configured but this configuration can be added to by following the steps below:
 
 Create a new folder in the config folder with a custom name. In this folder add the following four files:
    1. `.names` file - this defines the names of the detections
@@ -94,15 +94,7 @@ Since `detection_visualizer` is already part of this repository, you do not need
 
 ##  Run the visualizer
 
-The default topics for the incoming image and the detections are shown in the code
-snippet below.
-
-```python
-        image_sub = message_filters.Subscriber(self, Image, '/camera/image_raw', qos_profile=qos_profile_sensor_data)
-        detections_sub = message_filters.Subscriber(self, Vision, '/camera/detections', qos_profile=1)
-```
-
-If we want to use different topics, then we can remap the topics to match the required fields with ROS arguments as shown below.
+The default topics for the incoming image is `/camera/image_raw` and the detections on the topic `/camera/detections`. If we want to use different topics, then we can remap the topics to match the required fields with ROS arguments as shown below.
 
 ``` bash
 
@@ -114,7 +106,7 @@ ros2 run detection_visualizer detection_visualizer \
 ```
 
 Then view the output which combines the incoming image and bounding boxes and
-publishes that to topic `dbg\_images`.
+publishes that to topic `dbg_images`.
 
 ``` bash
 ros2 run rqt_image_view rqt_image_view /dbg_images
@@ -151,20 +143,20 @@ sudo apt install ros-${ROS_DISTRO}-image-publisher
 
 ##  Publish a demo image
 
-Download or provide a test image (for example, `config/dog.jpg`) and publish it:
+Download or provide a test image (for example, `config/dog.jpg`) and publish it to
+`/camera/image_raw`.
 
 ```bash
 wget https://raw.githubusercontent.com/pjreddie/darknet/master/data/dog.jpg -O dog.jpg
 
-ros2 run image_publisher image_publisher_node dog.jpg --ros-args -r image_raw:=/demo/image
+ros2 run image_publisher image_publisher_node dog.jpg --ros-args -r image_raw:=/camera/image_raw
 
 ```
 
-This publishes the image on the topic `/demo/image`. You can use the image visualiser
-in rqt to test that this has worked.
+You can use the image visualiser in rqt to test that this has worked.
 
 ```bash
-ros2 run rqt_image_view rqt_image_view /demo/image
+ros2 run rqt_image_view rqt_image_view /camera/image_raw
 ```
 
 
@@ -174,28 +166,42 @@ In another terminal:
 
 ```bash
 ros2 launch op3_vision_darknet detector.launch.py rgb_image:=/demo/image detections:=/camera/detections
+```
+
+In another terminal you can watch the detections topic to see the details of the
+bounding box and the confidence for each class hypothesis.
+
+```bash
 ros2 topic echo /camera/detections
 ```
+
 This will print out each detection message, showing the class ID, label, confidence score, and bounding box coordinates.
-You should see logs indicating the network loaded successfully and that detections are being made.
 
-
-
-## Visualising Detections with RQT
-
-Open `RQT` to see both the input image and the published detections:
 
 ![rqt demo image and detections](../assets/rqt_demo_image.png)
 
+## Visualising Detections with RQT
 
-1. Select `/demo/image` to see the published input image.
+Because we are using the default topic names in this example, we can launch the
+detection visualizer and observe the bounding boxes in rqt on the topic `/dbg_images`.
+
+``` bash
+ros2 run detection_visualizer detection_visualizer
+```
+
+
+Open `RQT` to see both the input image and the published detections, and now also the
+bounding boxes.
+
+
+
+1. Select `/camera/image_raw` to see the published input image.
 2. Use Topic Monitor in `rqt` to view `/camera/detections`.
 3. Detected objects will appear with class labels, bounding boxes, and confidence scores.
+4. Use the visualization plugin on the `/dbg_images` topic.
 
-Or even simpler, just open rqt image view.
-
-Open `rqt_image_view` and select:
-
+Or even simpler, just open rqt image view we used previously, and change the topic
+displayed.
 
 
 ![rqt detection bounding boxes](../assets/rqt-detections.png)
