@@ -19,10 +19,6 @@ import cv_bridge
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
-from rclpy.qos import QoSDurabilityPolicy
-from rclpy.qos import QoSHistoryPolicy
-from rclpy.qos import QoSProfile
-from rclpy.qos import QoSReliabilityPolicy
 from sensor_msgs.msg import Image
 from op3_vision_msgs.msg import Vision
 import message_filters
@@ -61,14 +57,8 @@ class DetectionVisualizerNode(Node):
 
         self._status_timer = self.create_timer(5.0, self._log_status)
 
-        # publisher with reliable QoS
-        output_image_qos = QoSProfile(
-            history=QoSHistoryPolicy.KEEP_LAST,
-            durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
-            reliability=QoSReliabilityPolicy.RELIABLE,
-            depth=1)
-
-        self._image_pub = self.create_publisher(Image, '/dbg_images', output_image_qos)
+        # publish debug image with sensor data QoS so tooling like rqt_image_view can subscribe
+        self._image_pub = self.create_publisher(Image, '/dbg_images', qos_profile_sensor_data)
 
         # subscribers with message_filters to sync image + detections
         image_sub = message_filters.Subscriber(self, Image, image_topic,
