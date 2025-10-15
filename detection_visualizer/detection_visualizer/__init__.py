@@ -17,8 +17,8 @@ import sys
 import cv2
 import cv_bridge
 import rclpy
-from rclpy.qos import qos_profile_sensor_data
 from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
 from rclpy.qos import QoSDurabilityPolicy
 from rclpy.qos import QoSHistoryPolicy
 from rclpy.qos import QoSProfile
@@ -39,9 +39,27 @@ class DetectionVisualizerNode(Node):
         # configurable topic names
         self.declare_parameter('image_topic', '/camera/image_raw')
         self.declare_parameter('detections_topic', '/camera/detections')
+        self.declare_parameter('sync_slop', 0.3)
+        self.declare_parameter('allow_headerless', False)
         image_topic = self.get_parameter('image_topic').get_parameter_value().string_value
         detections_topic = self.get_parameter('detections_topic').get_parameter_value().string_value
+        sync_slop = float(self.get_parameter('sync_slop').value)
+        allow_headerless = bool(self.get_parameter('allow_headerless').value)
 
+        self._last_image_log_ns = 0
+        self._last_detection_log_ns = 0
+        self._image_count = 0
+        self._detections_count = 0
+        self._sync_count = 0
+        self._last_image_stamp = None
+        self._last_detection_stamp = None
+
+        self.get_logger().info(
+            f"Waiting for image on '{image_topic}' and detections on '{detections_topic}' "
+            f"(sync slop {sync_slop:.3f}s, allow_headerless={allow_headerless})"
+        )
+
+        self._status_timer = self.create_timer(5.0, self._log_status)
 
         # publisher with reliable QoS
         output_image_qos = QoSProfile(
@@ -58,17 +76,37 @@ class DetectionVisualizerNode(Node):
         detections_sub = message_filters.Subscriber(self, Vision,
                                                     detections_topic,
                                                     qos_profile=qos_profile_sensor_data)
+        image_sub.registerCallback(self._image_debug_callback)
+        detections_sub.registerCallback(self._detections_debug_callback)
 
         ts = message_filters.ApproximateTimeSynchronizer(
-            [image_sub, detections_sub], queue_size=5, slop=0.3
+            [image_sub, detections_sub], queue_size=5, slop=sync_slop,
+            allow_headerless=allow_headerless
         )
         ts.registerCallback(self.synced_callback)
 
-
+    @staticmethod
+    def _stamp_to_float(stamp):
+        return float(stamp.sec) + float(stamp.nanosec) * 1e-9
 
     def synced_callback(self, image_msg, detections_msg):
         # called when both image and detections with close timestamps are received
         self.image_message = image_msg
+
+        image_stamp = image_msg.header.stamp
+        detection_stamp = detections_msg.header.stamp
+        self._sync_count += 1
+        if detection_stamp.sec == 0 and detection_stamp.nanosec == 0:
+            self.get_logger().warn(
+                "Received detections without timestamp; consider setting detections header stamp."
+            )
+        else:
+            delta = self._stamp_to_float(image_stamp) - self._stamp_to_float(detection_stamp)
+            self.get_logger().debug(
+                f"Synced image {image_stamp.sec}.{image_stamp.nanosec:09d}s with detections "
+                f"{detection_stamp.sec}.{detection_stamp.nanosec:09d}s (dt={delta:.3f}s, "
+                f"{len(detections_msg.detections)} detections)"
+            )
 
         cv_image = self._bridge.imgmsg_to_cv2(image_msg)
 
@@ -101,11 +139,44 @@ class DetectionVisualizerNode(Node):
         dbg_image_msg.header = image_msg.header
         self._image_pub.publish(dbg_image_msg)
 
- 
+    def _image_debug_callback(self, image_msg):
+        self._image_count += 1
+        self._last_image_stamp = image_msg.header.stamp
+        now_ns = self.get_clock().now().nanoseconds
+        if now_ns - self._last_image_log_ns >= 1_000_000_000:
+            stamp = image_msg.header.stamp
+            self.get_logger().info(
+                f"Image received #{self._image_count} stamp {stamp.sec}.{stamp.nanosec:09d} "
+                f"frame '{image_msg.header.frame_id}'"
+            )
+            self._last_image_log_ns = now_ns
+
+    def _detections_debug_callback(self, detections_msg):
+        self._detections_count += 1
+        self._last_detection_stamp = detections_msg.header.stamp
+        now_ns = self.get_clock().now().nanoseconds
+        if now_ns - self._last_detection_log_ns >= 1_000_000_000:
+            stamp = detections_msg.header.stamp
+            self.get_logger().info(
+                f"Detections received #{self._detections_count} stamp {stamp.sec}.{stamp.nanosec:09d} "
+                f"count {len(detections_msg.detections)}"
+            )
+            self._last_detection_log_ns = now_ns
+
+    def _log_status(self):
+        image_stamp = (f"{self._last_image_stamp.sec}.{self._last_image_stamp.nanosec:09d}"
+                       if self._last_image_stamp else "n/a")
+        detection_stamp = (f"{self._last_detection_stamp.sec}.{self._last_detection_stamp.nanosec:09d}"
+                           if self._last_detection_stamp else "n/a")
+        self.get_logger().info(
+            f"Status: images received={self._image_count} (last {image_stamp}), "
+            f"detections received={self._detections_count} (last {detection_stamp}), "
+            f"sync callbacks={self._sync_count}"
+        )
+
 def main():
     rclpy.init()
     node = DetectionVisualizerNode()
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
-
