@@ -36,6 +36,13 @@ class DetectionVisualizerNode(Node):
         self._bridge = cv_bridge.CvBridge()
         self.image_message = None  # store the most recent image
 
+        # configurable topic names
+        self.declare_parameter('image_topic', '/camera/image_raw')
+        self.declare_parameter('detections_topic', '/camera/detections')
+        image_topic = self.get_parameter('image_topic').get_parameter_value().string_value
+        detections_topic = self.get_parameter('detections_topic').get_parameter_value().string_value
+
+
         # publisher with reliable QoS
         output_image_qos = QoSProfile(
             history=QoSHistoryPolicy.KEEP_LAST,
@@ -46,11 +53,14 @@ class DetectionVisualizerNode(Node):
         self._image_pub = self.create_publisher(Image, '/dbg_images', output_image_qos)
 
         # subscribers with message_filters to sync image + detections
-        image_sub = message_filters.Subscriber(self, Image, '/camera/image_raw', qos_profile=qos_profile_sensor_data)
-        detections_sub = message_filters.Subscriber(self, Vision, '/camera/detections', qos_profile=1)
+        image_sub = message_filters.Subscriber(self, Image, image_topic,
+                                               qos_profile=qos_profile_sensor_data)
+        detections_sub = message_filters.Subscriber(self, Vision,
+                                                    detections_topic,
+                                                    qos_profile=qos_profile_sensor_data)
 
         ts = message_filters.ApproximateTimeSynchronizer(
-            [image_sub, detections_sub], queue_size=5, slop=0.1
+            [image_sub, detections_sub], queue_size=5, slop=0.3
         )
         ts.registerCallback(self.synced_callback)
 
