@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import sys
 
 import cv2
@@ -37,10 +38,17 @@ class DetectionVisualizerNode(Node):
         self.declare_parameter('detections_topic', '/camera/detections')
         self.declare_parameter('sync_slop', 0.3)
         self.declare_parameter('allow_headerless', False)
+        self.declare_parameter('sync_mode', 'approx')
         image_topic = self.get_parameter('image_topic').get_parameter_value().string_value
         detections_topic = self.get_parameter('detections_topic').get_parameter_value().string_value
         sync_slop = float(self.get_parameter('sync_slop').value)
         allow_headerless = bool(self.get_parameter('allow_headerless').value)
+        sync_mode = str(self.get_parameter('sync_mode').value).lower()
+        if sync_mode not in ('approx', 'latest'):
+            self.get_logger().warning(
+                f"Unsupported sync_mode '{sync_mode}', defaulting to 'approx'"
+            )
+            sync_mode = 'approx'
 
         self._last_image_log_ns = 0
         self._last_detection_log_ns = 0
@@ -49,10 +57,16 @@ class DetectionVisualizerNode(Node):
         self._sync_count = 0
         self._last_image_stamp = None
         self._last_detection_stamp = None
+        self._allow_headerless = allow_headerless
+        self._sync_slop = sync_slop
+        self._sync_mode = sync_mode
+        self._latest_detection_msg = None
+        self._latest_delta_warned_stamp = None
+        self._latest_headerless_warned = False
 
         self.get_logger().info(
             f"Waiting for image on '{image_topic}' and detections on '{detections_topic}' "
-            f"(sync slop {sync_slop:.3f}s, allow_headerless={allow_headerless})"
+            f"(sync slop {sync_slop:.3f}s, allow_headerless={allow_headerless}, mode={sync_mode})"
         )
 
         self._status_timer = self.create_timer(5.0, self._log_status)
@@ -60,20 +74,39 @@ class DetectionVisualizerNode(Node):
         # publish debug image with sensor data QoS so tooling like rqt_image_view can subscribe
         self._image_pub = self.create_publisher(Image, '/dbg_images', qos_profile_sensor_data)
 
-        # subscribers with message_filters to sync image + detections
-        image_sub = message_filters.Subscriber(self, Image, image_topic,
-                                               qos_profile=qos_profile_sensor_data)
-        detections_sub = message_filters.Subscriber(self, Vision,
-                                                    detections_topic,
-                                                    qos_profile=qos_profile_sensor_data)
-        image_sub.registerCallback(self._image_debug_callback)
-        detections_sub.registerCallback(self._detections_debug_callback)
+        if self._sync_mode == 'approx':
+            # subscribers with message_filters to sync image + detections
+            image_sub = message_filters.Subscriber(
+                self, Image, image_topic, qos_profile=qos_profile_sensor_data
+            )
+            detections_sub = message_filters.Subscriber(
+                self, Vision, detections_topic, qos_profile=qos_profile_sensor_data
+            )
+            image_sub.registerCallback(self._image_debug_callback)
+            detections_sub.registerCallback(self._detections_debug_callback)
 
-        ts = message_filters.ApproximateTimeSynchronizer(
-            [image_sub, detections_sub], queue_size=5, slop=sync_slop,
-            allow_headerless=allow_headerless
-        )
-        ts.registerCallback(self.synced_callback)
+            ts = message_filters.ApproximateTimeSynchronizer(
+                [image_sub, detections_sub],
+                queue_size=5,
+                slop=sync_slop,
+                allow_headerless=allow_headerless,
+            )
+            ts.registerCallback(self.synced_callback)
+            self.get_logger().info("Using ApproximateTimeSynchronizer.")
+        else:
+            self.get_logger().info("Using 'latest' synchronization mode.")
+            self._image_subscription = self.create_subscription(
+                Image,
+                image_topic,
+                self._image_latest_callback,
+                qos_profile_sensor_data,
+            )
+            self._detections_subscription = self.create_subscription(
+                Vision,
+                detections_topic,
+                self._detections_latest_callback,
+                qos_profile_sensor_data,
+            )
 
     @staticmethod
     def _stamp_to_float(stamp):
@@ -163,6 +196,40 @@ class DetectionVisualizerNode(Node):
             f"detections received={self._detections_count} (last {detection_stamp}), "
             f"sync callbacks={self._sync_count}"
         )
+
+    def _image_latest_callback(self, image_msg):
+        self._image_debug_callback(image_msg)
+        if self._latest_detection_msg is None:
+            return
+        detection_msg = self._latest_detection_msg
+        detection_stamp = detection_msg.header.stamp
+        if (not self._allow_headerless and
+                detection_stamp.sec == 0 and detection_stamp.nanosec == 0):
+            if not self._latest_headerless_warned:
+                self.get_logger().warn(
+                    "Latest sync mode received detections without timestamps; skipping overlay. "
+                    "Set allow_headerless:=true to bypass."
+                )
+                self._latest_headerless_warned = True
+            return
+
+        if detection_stamp.sec != 0 or detection_stamp.nanosec != 0:
+            delta = self._stamp_to_float(image_msg.header.stamp) - self._stamp_to_float(detection_stamp)
+            stamp_tuple = (detection_stamp.sec, detection_stamp.nanosec)
+            if abs(delta) > self._sync_slop and self._latest_delta_warned_stamp != stamp_tuple:
+                self.get_logger().warn(
+                    f"Latest sync mode: image/detection delta {delta:.3f}s exceeds sync_slop "
+                    f"{self._sync_slop:.3f}s; overlaying anyway."
+                )
+                self._latest_delta_warned_stamp = stamp_tuple
+
+        self.synced_callback(image_msg, detection_msg)
+
+    def _detections_latest_callback(self, detections_msg):
+        self._detections_debug_callback(detections_msg)
+        self._latest_detection_msg = copy.deepcopy(detections_msg)
+        self._latest_delta_warned_stamp = None
+        self._latest_headerless_warned = False
 
 def main():
     rclpy.init()
