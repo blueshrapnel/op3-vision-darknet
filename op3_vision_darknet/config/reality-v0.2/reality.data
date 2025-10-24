@@ -1,0 +1,5 @@
+classes = 7
+train = /media/panther/TORSO_21_dataset/data/reality/reality_train.txt
+valid = /media/panther/TORSO_21_dataset/data/reality/reality_valid.txt
+names = /media/panther/TORSO_21_dataset/data/reality/reality.names
+backup = /media/panther/TORSO_21_dataset/data/reality
